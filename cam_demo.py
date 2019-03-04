@@ -61,8 +61,8 @@ def arg_parse():
 
 def open_cap():
     cap = cv2.VideoCapture("rtsp://admin:qwer1234@192.168.30.64:554/h264/ch1/sub/av_stream")
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    cap.set(cv2.CAP_PROP_FPS, 30)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 30)
+    cap.set(cv2.CAP_PROP_FPS, 31)
     return cap
 
 image_queue = deque(maxlen=31)
@@ -99,7 +99,8 @@ if __name__ == '__main__':
     model.net_info["height"] = args.reso
     inp_dim = int(model.net_info["height"])
     # -vcodec h264, -vcodec libx264 -acodec copy -pix_fmt yuv420p
-    cmd = "/usr/local/bin/ffmpeg -framerate 4 -f image2pipe -vcodec mjpeg -i - -vcodec libx264 -vb 250k -framerate 4 -f flv 'rtmp://192.168.30.102/oflaDemo/ipc64 live=1'"
+    #cmd = "ffmpeg -framerate 4 -f image2pipe -vcodec mjpeg -i - -vcodec libx264 -vb 250k -framerate 4 -f flv 'rtmp://192.168.30.102/oflaDemo/ipc64 live=1'"
+    cmd = "ffmpeg -framerate 25 -f image2pipe -vcodec mjpeg -i - -vcodec libx264 -vb 250k -framerate 25 -g 24 -f flv 'rtmp://localhost/oflaDemo/ipc64 live=1'"
     proc = sp.Popen(cmd, stdin=sp.PIPE, shell=True)
     assert inp_dim % 32 == 0
     assert inp_dim > 32
@@ -118,12 +119,21 @@ if __name__ == '__main__':
     colors = pkl.load(open("pallete", "rb"))
     ret = True
     time.sleep(3)
+    raw = False
     while True:
         try:
             frame = image_queue.popleft()
         except:
-            print("Unexpected error:", sys.exc_info()[0])
-            time.sleep(0.5)
+            #print("Unexpected error:", sys.exc_info()[0])
+            time.sleep(0.01)
+            continue
+
+        if raw:
+            _none, jpg = cv2.imencode('.jpg', frame)
+            proc.stdin.write(jpg.tobytes())
+            frames += 1
+            if frames % 1800 == 0:
+               print("FPS of the video is {:5.2f}".format( frames / (time.time() - start)))
             continue
 
         #print('image queue size:', len(image_queue))
@@ -131,7 +141,7 @@ if __name__ == '__main__':
             time.sleep(0.5)
             print('No Frame')
             continue
-        img, orig_im, dim = prep_image(frame, inp_dim)                            
+        img, orig_im, dim = prep_image(frame, inp_dim)
         if CUDA:
             img = img.cuda()
         
