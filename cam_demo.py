@@ -154,7 +154,6 @@ def livestream(rtsp, ifps, rtmp, ofps, weights, size, buffsize, confidence, nms_
                print("FPS of the video is {:5.2f}".format( frames / (time.time() - start)))
             continue
 
-        #print('image queue size:', len(image_queue))
         if frame is None:
             time.sleep(0.5)
             print('No Frame')
