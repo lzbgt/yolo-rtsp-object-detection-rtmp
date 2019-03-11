@@ -147,15 +147,14 @@ def livestream(rtsp, ifps, rtmp, ofps, weights, size, buffsize, confidence, nms_
             continue
 
         if raw:
-            _none, jpg = cv2.imencode('.jpg', frame)
-            proc.stdin.write(jpg.tobytes(), classes, colors)
+            image_write_queue.append(frame)
             frames += 1
             if frames % 1800 == 0:
                print("FPS of the video is {:5.2f}".format( frames / (time.time() - start)))
             continue
 
         if frame is None:
-            time.sleep(0.5)
+            time.sleep(0.01)
             print('No Frame')
             continue
         img, orig_im, dim = prep_image(frame, inp_dim)
