@@ -78,7 +78,7 @@ def predict_transform(prediction, inp_dim, anchors, num_classes, CUDA = True):
     return prediction
 
 def load_classes(namesfile):
-    fp = open(namesfile, "r")
+    fp = open(namesfile, "r", encoding="utf-8")
     names = fp.read().split("\n")[:-1]
     return names
 
@@ -100,12 +100,10 @@ def write_results(prediction, confidence, num_classes, nms = True, nms_conf = 0.
     conf_mask = (prediction[:,:,4] > confidence).float().unsqueeze(2)
     prediction = prediction*conf_mask
     
-
     try:
         ind_nz = torch.nonzero(prediction[:,:,4]).transpose(0,1).contiguous()
     except:
         return 0
-    
     
     box_a = prediction.new(prediction.shape)
     box_a[:,:,0] = (prediction[:,:,0] - prediction[:,:,2]/2)
