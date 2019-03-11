@@ -46,21 +46,21 @@ def write(x, img, classes, colors):
     cv2.putText(img, label, (c1[0], c1[1] + t_size[1] + 4), cv2.FONT_HERSHEY_PLAIN, 1, [225,255,255], 1)
     return img
 
-def open_cap(vuri):
+def open_cap(vuri, ifps, buffsize):
     cap = cv2.VideoCapture(vuri)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 30)
-    cap.set(cv2.CAP_PROP_FPS, 31)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, buffsize)
+    cap.set(cv2.CAP_PROP_FPS, ifps)
     return cap
 
 image_queue = deque(maxlen=31)
 
-def fn_enque_image(rtsp_url):
+def fn_enque_image(rtsp_url, ifps, buffsize):
     ret = False
     cap = None
     while True:
         if not ret:
             print('reopen rtsp')
-            cap = open_cap(rtsp_url)
+            cap = open_cap(rtsp_url, ifps, buffsize)
         ret, frame = cap.read()
         if ret:
             image_queue.append(frame)
@@ -68,23 +68,23 @@ def fn_enque_image(rtsp_url):
 
 @click.command()
 @click.option("--rtsp", default="rtsp://admin:qwer1234@192.168.30.64:554/h264/ch1/sub/av_stream", help="rtsp url of ipcamera")
-@click.option("--ifps", default=4, help="fps of video processing output, eg. 4")
+@click.option("--ifps", default=25, help="fps of video processing output, eg. 4")
 @click.option("--rtmp", default="rtmp://localhost/oflaDemo/ipc64 live=1", help="url of rtmp server")
 @click.option("--ofps", default=4, help="output rtmp fps, eg. 4")
 @click.option("--weights", default="yolov3.weights", help="path to yolo weights")
 @click.option("--size", default="", help="output video size. eg. 680x460")
+@click.option("--buffsize", default=3, help="queque size for rtsp")
 @click.option("--confidence", default = 0.25, help = "Object Confidence to filter predictions")
 @click.option("--nms_thresh", default = 0.4, help = "NMS Threshhold")
 @click.option("--reso", default = "160", help = 
                         "Input resolution of the network. Increase to increase accuracy. Decrease to increase speed")      
-def livestream(rtsp, ifps, rtmp, ofps, weights, size, confidence, nms_thresh,reso):
+def livestream(rtsp, ifps, rtmp, ofps, weights, size, buffsize, confidence, nms_thresh,reso):
     cfgfile = "cfg/yolov3.cfg"
     weightsfile = weights
 
     num_classes = 80
     start = 0
     CUDA = torch.cuda.is_available()
-    bbox_attrs = 5 + num_classes
     
     model = Darknet(cfgfile)
     model.load_weights(weightsfile)
@@ -92,12 +92,11 @@ def livestream(rtsp, ifps, rtmp, ofps, weights, size, confidence, nms_thresh,res
     model.net_info["height"] = reso
     inp_dim = int(model.net_info["height"])
     # -vcodec h264, -vcodec libx264 -acodec copy -pix_fmt yuv420p
-    #cmd = "ffmpeg -framerate 4 -f image2pipe -vcodec mjpeg -i - -vcodec libx264 -vb 250k -framerate 4 -f flv 'rtmp://192.168.30.102/oflaDemo/ipc64 live=1'"
     #cmd = "ffmpeg -framerate 4 -f image2pipe -vcodec mjpeg -i - -vcodec libx264 -vb 250k -framerate 4 -g 24 -f flv 'rtmp://localhost/oflaDemo/ipc64 live=1'"
     if size:
         size = "-s " + size
 
-    cmd = "ffmpeg -framerate {ifps} -f image2pipe -vcodec mjpeg -i - -vcodec libx264 {size} -vb 250k -framerate {ofps} -g 24 -f flv '{rtmp}'".format(ifps=ifps, ofps=ofps, rtmp=rtmp, size=size)
+    cmd = "ffmpeg -framerate {ofps} -f image2pipe -vcodec mjpeg -i - -vcodec libx264 {size} -vb 250k -framerate {ofps} -g 24 -f flv '{rtmp}'".format(ofps=ofps, rtmp=rtmp, size=size)
     print('cmd: ', cmd)
     proc = sp.Popen(cmd, stdin=sp.PIPE, shell=True)
     assert inp_dim % 32 == 0
@@ -108,7 +107,7 @@ def livestream(rtsp, ifps, rtmp, ofps, weights, size, confidence, nms_thresh,res
 
     model.eval()
 
-    t = threading.Thread(target=fn_enque_image, args=(rtsp,))
+    t = threading.Thread(target=fn_enque_image, args=(rtsp, ifps, buffsize))
     t.start()
     
     frames = 0
