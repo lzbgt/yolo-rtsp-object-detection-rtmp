@@ -82,7 +82,7 @@ def fn_write_image(proc):
 @click.option("--rtsp", default="rtsp://admin:qwer1234@192.168.30.64:554/h264/ch1/sub/av_stream", help="rtsp url of ipcamera")
 @click.option("--ifps", default=25, help="fps of rtsp stream, eg. 25")
 @click.option("--rtmp", default="rtmp://localhost/oflaDemo/ipc64 live=1", help="url of rtmp server")
-@click.option("--ofps", default=4, help="output rtmp fps, eg. 4")
+@click.option("--ofps", default=3, help="output rtmp fps, eg. 4")
 @click.option("--weights", default="yolov3.weights", help="path to yolo weights")
 @click.option("--size", default="", help="output video size. eg. 680x460")
 @click.option("--buffsize", default=4, help="queque size for rtsp")
