@@ -21,7 +21,6 @@ import pickle as pkl
 def prep_image(img, inp_dim):
     """
     Prepare image for inputting to the neural network. 
-    
     Returns a Variable 
     """
 
@@ -37,7 +36,6 @@ def write(x, img, classes, colors):
     c2 = tuple(x[3:5].int())
     cls = int(x[-1])
     label = "{0}".format(classes[cls])
-    # print('label: ', label)
     color = random.choice(colors)
     cv2.rectangle(img, c1, c2,color, 1)
     t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 1 , 1)[0]
@@ -52,7 +50,7 @@ def open_cap(vuri, ifps, buffsize):
     cap.set(cv2.CAP_PROP_FPS, ifps)
     return cap
 
-image_queue = deque(maxlen=31)
+image_queue = None
 
 def fn_enque_image(rtsp_url, ifps, buffsize):
     ret = False
@@ -63,22 +61,26 @@ def fn_enque_image(rtsp_url, ifps, buffsize):
             cap = open_cap(rtsp_url, ifps, buffsize)
         ret, frame = cap.read()
         if ret:
-            image_queue.append(frame)
-            #print('enqueued')
+            try:
+                image_queue.append(frame)
+            except:
+                print("Unexpected error:", sys.exc_info()[0])
 
 @click.command()
 @click.option("--rtsp", default="rtsp://admin:qwer1234@192.168.30.64:554/h264/ch1/sub/av_stream", help="rtsp url of ipcamera")
-@click.option("--ifps", default=25, help="fps of video processing output, eg. 4")
+@click.option("--ifps", default=25, help="fps of rtsp stream, eg. 25")
 @click.option("--rtmp", default="rtmp://localhost/oflaDemo/ipc64 live=1", help="url of rtmp server")
 @click.option("--ofps", default=4, help="output rtmp fps, eg. 4")
 @click.option("--weights", default="yolov3.weights", help="path to yolo weights")
 @click.option("--size", default="", help="output video size. eg. 680x460")
-@click.option("--buffsize", default=3, help="queque size for rtsp")
+@click.option("--buffsize", default=4, help="queque size for rtsp")
 @click.option("--confidence", default = 0.25, help = "Object Confidence to filter predictions")
 @click.option("--nms_thresh", default = 0.4, help = "NMS Threshhold")
 @click.option("--reso", default = "160", help = 
                         "Input resolution of the network. Increase to increase accuracy. Decrease to increase speed")      
 def livestream(rtsp, ifps, rtmp, ofps, weights, size, buffsize, confidence, nms_thresh,reso):
+    global image_queue
+    image_queue = deque(maxlen=buffsize)
     cfgfile = "cfg/yolov3.cfg"
     weightsfile = weights
 
