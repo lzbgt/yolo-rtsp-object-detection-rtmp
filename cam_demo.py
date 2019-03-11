@@ -1,6 +1,6 @@
 from __future__ import division
 import os
-import sys
+import sys, traceback
 import time
 import threading
 import subprocess as sp
@@ -51,6 +51,7 @@ def open_cap(vuri, ifps, buffsize):
     return cap
 
 image_queue = None
+image_write_queue = None
 
 def fn_enque_image(rtsp_url, ifps, buffsize):
     ret = False
@@ -66,6 +67,17 @@ def fn_enque_image(rtsp_url, ifps, buffsize):
             except:
                 print("Unexpected error:", sys.exc_info()[0])
 
+def fn_write_image(proc):
+    while True:
+        try:
+            image = image_write_queue.popleft()
+            _none, jpg = cv2.imencode('.jpg', image)
+            proc.stdin.write(jpg.tobytes())
+        except:
+            # print(traceback.format_exc())
+            time.sleep(0.01)
+
+
 @click.command()
 @click.option("--rtsp", default="rtsp://admin:qwer1234@192.168.30.64:554/h264/ch1/sub/av_stream", help="rtsp url of ipcamera")
 @click.option("--ifps", default=25, help="fps of rtsp stream, eg. 25")
@@ -80,12 +92,15 @@ def fn_enque_image(rtsp_url, ifps, buffsize):
                         "Input resolution of the network. Increase to increase accuracy. Decrease to increase speed")      
 def livestream(rtsp, ifps, rtmp, ofps, weights, size, buffsize, confidence, nms_thresh,reso):
     global image_queue
+    global image_write_queue
+
     image_queue = deque(maxlen=buffsize)
+    image_write_queue = deque(maxlen=ifps)
+
     cfgfile = "cfg/yolov3.cfg"
     weightsfile = weights
 
     num_classes = 80
-    start = 0
     CUDA = torch.cuda.is_available()
     
     model = Darknet(cfgfile)
@@ -97,7 +112,7 @@ def livestream(rtsp, ifps, rtmp, ofps, weights, size, buffsize, confidence, nms_
     #cmd = "ffmpeg -framerate 4 -f image2pipe -vcodec mjpeg -i - -vcodec libx264 -vb 250k -framerate 4 -g 24 -f flv 'rtmp://localhost/oflaDemo/ipc64 live=1'"
     if size:
         size = "-s " + size
-
+    
     cmd = "ffmpeg -framerate {ofps} -f image2pipe -vcodec mjpeg -i - -vcodec libx264 {size} -vb 250k -framerate {ofps} -g 24 -f flv '{rtmp}'".format(ofps=ofps, rtmp=rtmp, size=size)
     print('cmd: ', cmd)
     proc = sp.Popen(cmd, stdin=sp.PIPE, shell=True)
@@ -111,6 +126,9 @@ def livestream(rtsp, ifps, rtmp, ofps, weights, size, buffsize, confidence, nms_
 
     t = threading.Thread(target=fn_enque_image, args=(rtsp, ifps, buffsize))
     t.start()
+
+    t2 = threading.Thread(target=fn_write_image, args=(proc,))
+    t2.start()
     
     frames = 0
     start = time.time()
@@ -118,12 +136,13 @@ def livestream(rtsp, ifps, rtmp, ofps, weights, size, buffsize, confidence, nms_
     colors = pkl.load(open("pallete", "rb"))
     time.sleep(3)
     raw = False
+    start = 0
 
     while True:
         try:
             frame = image_queue.popleft()
         except:
-            #print("Unexpected error:", sys.exc_info()[0])
+            print("Unexpected error:", sys.exc_info()[0])
             time.sleep(0.01)
             continue
 
@@ -149,8 +168,7 @@ def livestream(rtsp, ifps, rtmp, ofps, weights, size, buffsize, confidence, nms_
 
         if type(output) == int:
             frames += 1
-            _none, jpg = cv2.imencode('.jpg', orig_im)
-            proc.stdin.write(jpg.tobytes())
+            image_write_queue.append(orig_im)
             continue
         
         output[:,1:5] = torch.clamp(output[:,1:5], 0.0, float(inp_dim))/inp_dim
@@ -158,10 +176,10 @@ def livestream(rtsp, ifps, rtmp, ofps, weights, size, buffsize, confidence, nms_
         output[:,[2,4]] *= frame.shape[0]
         for x in output:
             write(x, orig_im, classes, colors)
-        _none, jpg = cv2.imencode('.jpg', orig_im)
-        proc.stdin.write(jpg.tobytes())
+
+        image_write_queue.append(orig_im)
         frames += 1
-        if frames % 180 == 0:
+        if frames % 1800 == 0:
             print("FPS of the video is {:5.2f}".format( frames / (time.time() - start)))
 
 if __name__ == '__main__':
