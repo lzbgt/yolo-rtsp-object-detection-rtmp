@@ -19,3 +19,14 @@ Options:
                       accuracy. Decrease to increase speed
   --help              Show this message and exit.
 ```
+
+## Commercial support
+
+For teams using this repo as a starting point for IP-camera ingest, RTSP reliability, YOLO inference, RTMP restreaming, Docker deployment, playback, or long-running edge-camera services, I offer a paid integration review:
+
+- Review page: https://x2.brucelu.top/edgecam/?source=github-yolo-rtsp-object-detection-rtmp
+- Sample deliverable: https://x2.brucelu.top/edgecam/sample/
+- Checkout: https://x2.brucelu.top/edgecam/checkout/?source=github-yolo-rtsp-object-detection-rtmp
+- Product catalog: https://x2.brucelu.top/products/?source=github-yolo-rtsp-object-detection-rtmp
+
+Boundary: this is paid engineering review/support. It does not include camera credential handling, guaranteed model accuracy, managed surveillance operation, or production deployment ownership.
